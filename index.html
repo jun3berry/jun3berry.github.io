@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Barcelona R5 - Panel</title>
+  <style>
+    :root {
+      --bg-color: #0d1117;
+      --text-color: #c9d1d9;
+      --primary-color: #58a6ff;
+      --secondary-color: #79c0ff;
+      --highlight-color: #3fb950;
+      --error-color: #f85149;
+      --table-header-bg: #161b22;
+      --table-row-even: #161b22;
+      --table-row-hover: #21262d;
+      --stats-card-bg: #161b22;
+      --metar-bg: #161b22;
+      --map-tile-dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+      --map-tile-light: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    }
+
+    body.light-mode {
+      --bg-color: #ffffff;
+      --text-color: #111;
+      --primary-color: #004080;
+      --secondary-color: #003366;
+      --highlight-color: #007700;
+      --error-color: #d12f2f;
+      --table-header-bg: #cce0ff;
+      --table-row-even: #f0f4f8;
+      --table-row-hover: #dfeeff;
+      --stats-card-bg: #f0f4f8;
+      --metar-bg: #e6f0ff;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 20px;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    h1 {
+      text-align: center;
+      color: var(--primary-color);
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 22px;
+      color: var(--secondary-color);
+      margin: 30px 0 10px;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    select, input[type="text"] {
+      padding: 8px;
+      border-radius: 6px;
+      border: none;
+      background-color: var(--table-header-bg);
+      color: var(--text-color);
+    }
+
+    select {
+      width: 100%;
+      max-width: 200px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      max-width: 300px;
+    }
+
+    button {
+      background-color: var(--table-header-bg);
+      color: var(--primary-color);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background-color: var(--table-row-hover);
+    }
+
+    .flight-table, .atc-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 40px;
+      font-size: 14px;
+    }
+
+    .flight-table th, .flight-table td, .atc-table th, .atc-table td {
+      border: 1px solid var(--table-row-hover);
+      padding: 10px;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .flight-table th, .atc-table th {
+      background-color: var(--table-header-bg);
+      color: var(--primary-color);
+    }
+
+    .flight-table tbody tr:nth-child(even),
+    .atc-table tbody tr:nth-child(even) {
+      background-color: var(--table-row-even);
+    }
+
+    .flight-table tbody tr:hover,
+    .atc-table tbody tr:hover {
+      background-color: var(--table-row-hover);
+    }
+
+    .highlight {
+      color: var(--highlight-color);
+      font-weight: bold;
+    }
+
+    .atc-highlight {
+      color: var(--error-color);
+      font-weight: bold;
+    }
+
+    .loading {
+      text-align: center;
+      font-style: italic;
+      color: #888;
+    }
+
+    .error {
+      text-align: center;
+      color: var(--error-color);
+      font-weight: bold;
+    }
+
+    .position-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      color: white;
+    }
+
+    .position-del { background-color: #58a6ff; }
+    .position-gnd { background-color: #3fb950; }
+    .position-twr { background-color: #d29922; }
+    .position-app { background-color: #db61a2; }
+    .position-dep { background-color: #db61a2; }
+    .position-ctr { background-color: #a371f7; }
+    .position-fss { background-color: #7ee787; }
+
+    /* Estilos para el mapa de calor */
+    .map-container {
+      height: 500px;
+      background-color: var(--table-header-bg);
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    #airportMap {
+      width: 100%;
+      height: 100%;
+    }
+
+    .stats-container {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background-color: var(--stats-card-bg);
+      border-radius: 8px;
+      padding: 15px;
+      text-align: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .stat-card h3 {
+      margin-top: 0;
+      color: var(--secondary-color);
+      font-size: 16px;
+    }
+
+    .stat-card .value {
+      font-size: 24px;
+      font-weight: bold;
+      color: var(--primary-color);
+      margin: 10px 0;
+    }
+
+    .stat-card .label {
+      font-size: 12px;
+      color: var(--text-color);
+      opacity: 0.8;
+    }
+
+    /* Estilos para METAR */
+    .metar-container {
+      background-color: var(--metar-bg);
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-family: monospace;
+    }
+
+    .metar-title {
+      color: var(--primary-color);
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    /* Estados de vuelo */
+    .status-parking { color: #58a6ff; }
+    .status-taxi { color: #3fb950; }
+    .status-takeoff { color: #d29922; }
+    .status-climb { color: #db61a2; }
+    .status-cruise { color: #a371f7; }
+    .status-descent { color: #7ee787; }
+    .status-approach { color: #ff7b72; }
+    .status-landing { color: #f0883e; }
+    .status-unknown { color: #8b949e; }
+
+    @media (max-width: 768px) {
+      .stats-container {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.css" />
+</head>
+<body>
+
+  <h1>Barcelona R5 - Panel</h1>
+
+  <div class="controls">
+    <select id="airportSelect">
+      <option value="LEIB">Aeropuerto de Ibiza</option>
+      <option value="LEPA">Aeropuerto de Palma de Mallorca</option>
+      <option value="LESB">Aeropuerto de Son Bonet</option>
+      <option value="LEMH">Aeropuerto de Menorca</option>
+    </select>
+    
+    <input type="text" id="searchInput" placeholder="Buscar vuelo, origen, destino o controlador...">
+    
+    <div>
+      <button onclick="loadData()">Actualizar</button>
+      <button onclick="toggleTheme()">Cambiar tema</button>
+    </div>
+  </div>
+
+  <!-- METAR Container -->
+  <div class="metar-container">
+    <div class="metar-title">METAR</div>
+    <div id="metarInfo">Cargando información meteorológica...</div>
+  </div>
+
+  <!-- Mapa de calor global -->
+  <div class="map-container">
+    <div id="airportMap"></div>
+  </div>
+
+  <!-- Estadísticas -->
+  <div class="stats-container">
+    <div class="stat-card">
+      <h3>Llegadas Hoy</h3>
+      <div class="value" id="arrivalsCount">0</div>
+      <div class="label">Vuelos entrantes</div>
+    </div>
+    
+    <div class="stat-card">
+      <h3>Salidas Hoy</h3>
+      <div class="value" id="departuresCount">0</div>
+      <div class="label">Vuelos salientes</div>
+    </div>
+    
+    <div class="stat-card">
+      <h3>Controladores</h3>
+      <div class="value" id="atcCount">0</div>
+      <div class="label">ATC conectados</div>
+    </div>
+  </div>
+
+  <div class="section-title">✈️ Llegadas</div>
+  <table class="flight-table" id="arrivalsTable">
+    <thead>
+      <tr>
+        <th onclick="sortTable(this, 0)">Vuelo</th>
+        <th onclick="sortTable(this, 1)">Origen</th>
+        <th onclick="sortTable(this, 2)">Hora</th>
+        <th onclick="sortTable(this, 3)">Avión</th>
+        <th onclick="sortTable(this, 4)">Squawk</th>
+        <th onclick="sortTable(this, 5)">Fase</th>
+        <th onclick="sortTable(this, 6)">Altitud</th>
+        <th onclick="sortTable(this, 7)">Velocidad</th>
+        <th onclick="sortTable(this, 8)">Ruta</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td colspan="9" class="loading">Seleccione un aeropuerto</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">🛫 Salidas</div>
+  <table class="flight-table" id="departuresTable">
+    <thead>
+      <tr>
+        <th onclick="sortTable(this, 0)">Vuelo</th>
+        <th onclick="sortTable(this, 1)">Destino</th>
+        <th onclick="sortTable(this, 2)">Hora</th>
+        <th onclick="sortTable(this, 3)">Avión</th>
+        <th onclick="sortTable(this, 4)">Squawk</th>
+        <th onclick="sortTable(this, 5)">Fase</th>
+        <th onclick="sortTable(this, 6)">Altitud</th>
+        <th onclick="sortTable(this, 7)">Velocidad</th>
+        <th onclick="sortTable(this, 8)">Ruta</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td colspan="9" class="loading">Seleccione un aeropuerto</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">🎧 Controladores ATC</div>
+  <table class="atc-table" id="atcTable">
+    <thead>
+      <tr>
+        <th onclick="sortTable(this, 0)">Posición</th>
+        <th onclick="sortTable(this, 1)">Controlador</th>
+        <th onclick="sortTable(this, 2)">Frecuencia</th>
+        <th onclick="sortTable(this, 3)">Horario</th>
+        <th onclick="sortTable(this, 4)">Rating</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td colspan="5" class="loading">Seleccione un aeropuerto</td>
+      </tr>
+    </tbody>
+  </table>
+
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script>
+// Configuración
+let CURRENT_AIRPORT = "";
+let airportMap = null;
+let heatLayer = null;
+let baseLayer = null;
+const REFRESH_INTERVAL = 60000; // 1 minuto
+const METAR_REFRESH_INTERVAL = 300000; // 5 minutos
+
+// Coordenadas de los aeropuertos con información extendida
+const AIRPORT_DATA = {
+  "LEPA": {
+    name: "Palma de Mallorca",
+    lat: 39.5517,
+    lon: 2.7388,
+    runways: [
+      { lat1: 39.5583, lon1: 2.7167, lat2: 39.5450, lon2: 2.7608, name: "06L/24R" },
+      { lat1: 39.5500, lon1: 2.7300, lat2: 39.5533, lon2: 2.7467, name: "06R/24L" }
+    ]
+  },
+  "LEIB": {
+    name: "Ibiza",
+    lat: 38.8729,
+    lon: 1.3731,
+    runways: [
+      { lat1: 38.8789, lon1: 1.3667, lat2: 38.8669, lon2: 1.3794, name: "06/24" }
+    ]
+  },
+  "LESB": {
+    name: "Son Bonet",
+    lat: 39.5989,
+    lon: 2.7028,
+    runways: [
+      { lat1: 39.6033, lon1: 2.6950, lat2: 39.5944, lon2: 2.7106, name: "06/24" }
+    ]
+  },
+  "LEMH": {
+    name: "Menorca",
+    lat: 39.8626,
+    lon: 4.2186,
+    runways: [
+      { lat1: 39.8689, lon1: 4.2100, lat2: 39.8564, lon2: 4.2272, name: "01/19" }
+    ]
+  }
+};
+
+// Objeto para almacenar los datos
+const flightsData = {
+  arrivals: [],
+  departures: [],
+  atc: [],
+  allFlights: []
+};
+
+// Inicializar el mapa con capa de calor
+function initMap() {
+  if (!airportMap) {
+    airportMap = L.map('airportMap', {
+      preferCanvas: true,
+      zoomControl: true,
+      center: [39.5, 2.7],
+      zoom: 6
+    });
+    
+    // Capa base oscura por defecto
+    baseLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(airportMap);
+  }
+}
+
+// Cambiar el estilo del mapa según el tema
+function updateMapTheme() {
+  if (!airportMap) return;
+  
+  airportMap.eachLayer(layer => {
+    if (layer instanceof L.TileLayer) {
+      airportMap.removeLayer(layer);
+    }
+  });
+  
+  if (document.body.classList.contains('light-mode')) {
+    baseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(airportMap);
+  } else {
+    baseLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(airportMap);
+  }
+  
+  // Re-add heat layer if it exists
+  if (heatLayer) {
+    heatLayer.addTo(airportMap);
+  }
+}
+
+// Actualizar el mapa de calor con todos los vuelos
+function updateHeatMap(flights) {
+  if (!airportMap) return;
+  
+  // Limpiar capa de calor anterior si existe
+  if (heatLayer) {
+    airportMap.removeLayer(heatLayer);
+    heatLayer = null;
+  }
+  
+  // Preparar datos para el mapa de calor
+  const heatData = flights
+    .filter(flight => flight.lastTrack?.latitude && flight.lastTrack?.longitude)
+    .map(flight => {
+      // Aumentar intensidad para vuelos cerca del aeropuerto seleccionado
+      let intensity = 0;
+      if (CURRENT_AIRPORT && AIRPORT_DATA[CURRENT_AIRPORT]) {
+        const airport = AIRPORT_DATA[CURRENT_AIRPORT];
+        const distance = Math.sqrt(
+          Math.pow(flight.lastTrack.latitude - airport.lat, 2) + 
+          Math.pow(flight.lastTrack.longitude - airport.lon, 2)
+        );
+        if (distance < 0.5) intensity = 1.0;
+        else if (distance < 1.0) intensity = 0.8;
+      }
+      return [
+        flight.lastTrack.latitude,
+        flight.lastTrack.longitude,
+        intensity
+      ];
+    });
+  
+  if (heatData.length > 0) {
+    heatLayer = L.heatLayer(heatData, {
+      radius: 30,
+      blur: 20,
+      maxZoom: 17,
+      minOpacity: 0.5,
+      gradient: {
+        0.2: 'blue',
+        0.4: 'cyan',
+        0.6: 'lime',
+        0.8: 'yellow',
+        1.0: 'red'
+      }
+    }).addTo(airportMap);
+  }
+}
+
+// Cargar METAR del aeropuerto
+async function loadMetar(icao) {
+  try {
+    // Intentar con VATSIM primero
+    let response = await fetch(`https://metar.vatsim.net/metar.php?id=${icao}`);
+    let metarText = await response.text();
+    
+    // Si no hay datos, intentar con otro servicio
+    if (!metarText || metarText.includes("No METAR available")) {
+      response = await fetch(`https://aviationweather.gov/api/data/metar?ids=${icao}`);
+      metarText = await response.text();
+    }
+    
+    document.getElementById("metarInfo").textContent = metarText || "No METAR disponible";
+  } catch (error) {
+    console.error("Error cargando METAR:", error);
+    document.getElementById("metarInfo").textContent = "Error cargando METAR. Actualizando en 5 minutos...";
+  }
+}
+
+// Determinar la fase de vuelo basado en altitud y velocidad
+function getFlightPhase(pilot) {
+  if (!pilot.lastTrack) return 'Desconocido';
+  
+  const altitude = pilot.lastTrack.altitude || 0;
+  const speed = pilot.lastTrack.groundSpeed || 0;
+  
+  // Para llegadas
+  if (pilot.flightPlan?.arrivalId === CURRENT_AIRPORT) {
+    if (altitude < 50 && speed < 30) return 'Estacionado';    
+    if (altitude < 50 && speed >= 30) return 'Rodaje';
+    if (altitude < 250 && speed >= 40) return 'En pista';
+    if (altitude < 1000) return 'Aproximación final';
+    if (altitude < 5000) return 'Aproximación';
+    if (altitude < 10000) return 'Descenso';
+    return 'Crucero';
+  }
+  
+  // Para salidas
+  if (pilot.flightPlan?.departureId === CURRENT_AIRPORT) {
+    if (altitude < 50 && speed < 30) return 'Estacionado';
+    if (altitude < 50 && speed >= 30) return 'Rodaje';
+    if (altitude < 1000) return 'Despegue';
+    if (altitude < 10000) return 'Ascenso';
+    return 'Crucero';
+  }
+  
+  return 'En ruta';
+}
+
+// Procesar controladores ATC (correctamente implementado)
+function processControllers(controllers) {
+  if (!controllers) return [];
+  
+  return controllers.filter(controller => {
+    // Filtramos solo controladores ATC (no pilotos)
+    if (!controller.position) return false;
+    
+    // Posiciones ATC típicas
+    const atcPositions = ['DEL', 'GND', 'TWR', 'APP', 'DEP', 'CTR', 'FSS'];
+    const pos = controller.position.toUpperCase();
+    
+    return atcPositions.some(atcPos => pos.includes(atcPos));
+  });
+}
+
+async function loadData() {
+  CURRENT_AIRPORT = document.getElementById("airportSelect").value;
+  if (!CURRENT_AIRPORT) return;
+  
+  try {
+    setLoadingState(true);
+    updateMapTheme();
+    loadMetar(CURRENT_AIRPORT);
+    
+    const response = await fetch("https://api.ivao.aero/v2/tracker/whazzup");
+    if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+    
+    const data = await response.json();
+    
+    if (data?.clients) {
+      // Procesar todos los vuelos primero para el heatmap
+      flightsData.allFlights = data.clients.pilots?.filter(p => p.flightPlan) || [];
+      
+      // Procesar llegadas y salidas para el aeropuerto seleccionado
+      processPilots(flightsData.allFlights);
+      
+      // Procesar controladores ATC correctamente
+      flightsData.atc = processControllers(data.clients.atcs || []);
+      
+      renderTables();
+      updateStats();
+      updateHeatMap(flightsData.allFlights);
+      
+      // Centrar mapa en el aeropuerto seleccionado
+      if (AIRPORT_DATA[CURRENT_AIRPORT]) {
+        const airport = AIRPORT_DATA[CURRENT_AIRPORT];
+        airportMap.setView([airport.lat, airport.lon], 10);
+      }
+    } else {
+      showError("No se encontraron datos en la respuesta");
+    }
+  } catch (error) {
+    console.error("Error cargando datos:", error);
+    showError(`Error: ${error.message}`);
+  } finally {
+    setLoadingState(false);
+  }
+}
+
+function processPilots(pilots) {
+  if (!pilots) return;
+  
+  flightsData.arrivals = pilots.filter(p => 
+    p.flightPlan?.arrivalId && p.flightPlan.arrivalId.toUpperCase() === CURRENT_AIRPORT
+  );
+  
+  flightsData.departures = pilots.filter(p => 
+    p.flightPlan?.departureId && p.flightPlan.departureId.toUpperCase() === CURRENT_AIRPORT
+  );
+}
+
+function updateStats() {
+  document.getElementById("arrivalsCount").textContent = flightsData.arrivals.length;
+  document.getElementById("departuresCount").textContent = flightsData.departures.length;
+  document.getElementById("atcCount").textContent = flightsData.atc.length;
+}
+
+function renderTables() {
+  renderTable(flightsData.arrivals, document.querySelector("#arrivalsTable tbody"), "arrival");
+  renderTable(flightsData.departures, document.querySelector("#departuresTable tbody"), "departure");
+  renderAtcTable(flightsData.atc, document.querySelector("#atcTable tbody"));
+}
+
+function formatTime(timestamp) {
+  if (!timestamp) return 'N/A';
+  return new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+}
+
+function formatAtcTime(atc) {
+  if (!atcs.lastTrack?.timestamp) return 'N/A';
+  const diff = Math.floor((Date.now() - new Date(atcs.lastTrack.timestamp)) / 60000);
+  return diff < 60 ? `${Math.floor(diff)} min` : `${Math.floor(diff/60)}h ${Math.floor(diff%60)}m`;
+}
+
+function getPositionBadge(position) {
+  if (!position) return '';
+  
+  const pos = position.toUpperCase();
+  let badgeClass = 'position-badge';
+  let displayName = pos.includes("_") ? pos.split("_")[1] : pos;
+  
+  if (pos.includes("_DEL")) badgeClass += ' position-del';
+  else if (pos.includes("_GND")) badgeClass += ' position-gnd';
+  else if (pos.includes("_TWR")) badgeClass += ' position-twr';
+  else if (pos.includes("_APP")) badgeClass += ' position-app';
+  else if (pos.includes("_DEP")) badgeClass += ' position-dep';
+  else if (pos.includes("_CTR")) badgeClass += ' position-ctr';
+  else if (pos.includes("_FSS")) badgeClass += ' position-fss';
+  
+  return `<span class="${badgeClass}" title="${pos}">${displayName}</span>`;
+}
+
+function renderTable(flights, tbody, type) {
+  tbody.innerHTML = "";
+
+  if (!flights || flights.length === 0) {
+    const row = tbody.insertRow();
+    const cell = row.insertCell();
+    cell.colSpan = 9;
+    cell.style.textAlign = "center";
+    cell.style.fontStyle = "italic";
+    cell.textContent = `No hay ${type === "arrival" ? "llegadas" : "salidas"} registradas`;
+    return;
+  }
+
+  flights.forEach(flight => {
+    const row = tbody.insertRow();
+    const airportCell = type === "arrival" 
+      ? (flight.flightPlan.departureId || 'N/A') 
+      : (flight.flightPlan.arrivalId || 'N/A');
+    
+    const flightPhase = getFlightPhase(flight);
+    const phaseClass = flightPhase.toLowerCase().replace(/[^a-z]/g, '-');
+    
+    row.innerHTML = `
+      <td class="highlight">${flight.callsign || 'N/A'}</td>
+      <td>${airportCell}</td>
+      <td>${formatTime(flight.lastTrack?.timestamp)}</td>
+      <td>${flight.flightPlan?.aircraftId || 'N/A'}</td>
+      <td>${flight.lastTrack?.transponder || 'N/A'}</td>
+      <td class="status-${phaseClass}">${flightPhase}</td>
+      <td>${flight.lastTrack?.altitude ? Math.round(flight.lastTrack.altitude) + ' ft' : 'N/A'}</td>
+      <td>${flight.lastTrack?.groundSpeed ? Math.round(flight.lastTrack.groundSpeed) + ' kt' : 'N/A'}</td>
+      <td>${flight.flightPlan?.route || 'N/A'}</td>
+    `;
+  });
+}
+
+function renderAtcTable(atcs, tbody) {
+  tbody.innerHTML = "";
+
+  if (!atcs || atcs.length === 0) {
+    const row = tbody.insertRow();
+    const cell = row.insertCell();
+    cell.colSpan = 5;
+    cell.style.textAlign = "center";
+    cell.style.fontStyle = "italic";
+    cell.textContent = "No hay controladores conectados";
+    return;
+  }
+
+  atcs.sort((a, b) => {
+    const posA = a.position?.toUpperCase() || '';
+    const posB = b.position?.toUpperCase() || '';
+    const priority = ['_DEL', '_GND', '_TWR', '_APP', '_DEP', '_CTR', '_FSS'];
+    const getPriority = pos => priority.findIndex(p => pos.includes(p)) + 1 || 999;
+    return getPriority(posA) - getPriority(posB) || posA.localeCompare(posB);
+  });
+
+  atcs.forEach(atcs => {
+    const row = tbody.insertRow();
+    const freq = atcs.atcSession.frequency ? (parseInt(atcs.atcSession.frequency)/1000).toFixed(3) : 'N/A';
+    const rating = atcs.rating ? atcs.rating.replace('ATC_', '').replace('_', ' ') : 'N/A';
+    
+    row.innerHTML = `
+      <td>${getPositionBadge(atcs.atcSession.position)}</td>
+      <td class="atc-highlight">${atcs.callsign || 'N/A'}</td>
+      <td>${freq}</td>
+      <td>${formatAtcTime(atc)}</td>
+      <td>${rating}</td>
+    `;
+  });
+}
+
+function setLoadingState(isLoading) {
+  document.querySelectorAll(".loading").forEach(el => {
+    el.textContent = isLoading ? "Cargando datos..." : "";
+    el.style.display = isLoading ? "" : "none";
+  });
+}
+
+function showError(message) {
+  const errorRow = `<tr><td colspan="9" class="error">${message}</td></tr>`;
+  document.querySelector("#arrivalsTable tbody").innerHTML = errorRow;
+  document.querySelector("#departuresTable tbody").innerHTML = errorRow;
+  document.querySelector("#atcTable tbody").innerHTML = `<tr><td colspan="5" class="error">${message}</td></tr>`;
+}
+
+function toggleTheme() {
+  document.body.classList.toggle("light-mode");
+  updateMapTheme();
+}
+
+function sortTable(header, colIndex) {
+  const table = header.closest("table");
+  const tbody = table.querySelector("tbody");
+  const rows = Array.from(tbody.rows);
+  const isAscending = header.classList.toggle("asc");
+
+  rows.sort((a, b) => {
+    const valA = a.cells[colIndex].innerText.replace(/[^\d.-]/g, '') || a.cells[colIndex].innerText;
+    const valB = b.cells[colIndex].innerText.replace(/[^\d.-]/g, '') || b.cells[colIndex].innerText;
+    return isAscending
+      ? (isNaN(valA) ? valA.localeCompare(valB) : valA - valB)
+      : (isNaN(valA) ? valB.localeCompare(valA) : valB - valA);
+  });
+
+  rows.forEach(row => tbody.appendChild(row));
+}
+
+document.getElementById("searchInput").addEventListener("input", function() {
+  const term = this.value.toLowerCase();
+  document.querySelectorAll("table tbody tr").forEach(row => {
+    if (row.cells.length > 0) {
+      row.style.display = [...row.cells].some(cell => 
+        cell.innerText.toLowerCase().includes(term)
+      ) ? "" : "none";
+    }
+  });
+});
+
+document.getElementById("airportSelect").addEventListener("change", loadData);
+
+// Inicializar
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  loadData();
+  setInterval(loadData, REFRESH_INTERVAL);
+  setInterval(() => {
+    if (CURRENT_AIRPORT) loadMetar(CURRENT_AIRPORT);
+  }, METAR_REFRESH_INTERVAL);
+});
+</script>
+  <h6>Created with ❤️ by <a href=https://ivao.aero/Member.aspx?ID=495524">@jun3berry</a> - FIR de Barcelona</h1>
+</body>
+</html>
